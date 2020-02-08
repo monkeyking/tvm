@@ -16,19 +16,15 @@
 # under the License.
 """Functions defined in TVM."""
 # pylint: disable=invalid-name,unused-import,redefined-builtin
-from __future__ import absolute_import as _abs
-
 from numbers import Integral as _Integral
 
-from ._ffi.base import string_types
-from ._ffi.object import register_object, Object
-from ._ffi.node import register_node, NodeBase
-from ._ffi.node import convert_to_node as _convert_to_node
-from ._ffi.node_generic import _scalar_type_inference
-from ._ffi.function import Function
-from ._ffi.function import _init_api, register_func, get_global_func, extract_ext_funcs
-from ._ffi.function import convert_to_tvm_func as _convert_tvm_func
-from ._ffi.runtime_ctypes import TVMType
+import tvm._ffi
+import tvm.runtime._ffi_node_api
+
+from tvm.runtime import convert, const, DataType
+from ._ffi.base import string_types, TVMError
+from ._ffi.registry import register_func, get_global_func, extract_ext_funcs
+
 from . import _api_internal
 from . import make as _make
 from . import expr as _expr
@@ -36,6 +32,7 @@ from . import tensor as _tensor
 from . import schedule as _schedule
 from . import container as _container
 from . import tag as _tag
+from . import json_compact
 
 int8 = "int8"
 int32 = "int32"
@@ -75,27 +72,6 @@ def max_value(dtype):
     return _api_internal._max_value(dtype)
 
 
-def const(value, dtype=None):
-    """construct a constant
-
-    Parameters
-    ----------
-    value : number
-        The content of the constant number.
-
-    dtype : str or None, optional
-        The data type.
-
-    Returns
-    -------
-    const_val: tvm.Expr
-        The result expression.
-    """
-    if dtype is None:
-        dtype = _scalar_type_inference(value)
-    return _api_internal._const(value, dtype)
-
-
 def get_env_func(name):
     """Get an EnvFunc by a global name.
 
@@ -111,32 +87,11 @@ def get_env_func(name):
 
     Note
     ----
-    EnvFunc is a Node wrapper around
+    EnvFunc is a Object wrapper around
     global function that can be serialized via its name.
     This can be used to serialize function field in the language.
     """
     return _api_internal._EnvFuncGet(name)
-
-
-def convert(value):
-    """Convert value to TVM node or function.
-
-    Parameters
-    ----------
-    value : python value
-
-    Returns
-    -------
-    tvm_val : Node or Function
-        Converted value in TVM
-    """
-    if isinstance(value, (Function, NodeBase)):
-        return value
-
-    if callable(value):
-        return _convert_tvm_func(value)
-
-    return _convert_to_node(value)
 
 
 def load_json(json_str):
@@ -149,10 +104,15 @@ def load_json(json_str):
 
     Returns
     -------
-    node : Node
+    node : Object
         The loaded tvm node.
     """
-    return _api_internal._load_json(json_str)
+
+    try:
+        return tvm.runtime._ffi_node_api.LoadJSON(json_str)
+    except TVMError:
+        json_str = json_compact.upgrade_json(json_str)
+        return tvm.runtime._ffi_node_api.LoadJSON(json_str)
 
 
 def save_json(node):
@@ -160,15 +120,15 @@ def save_json(node):
 
     Parameters
     ----------
-    node : Node
-        A TVM Node object to be saved.
+    node : Object
+        A TVM object to be saved.
 
     Returns
     -------
     json_str : str
         Saved json string.
     """
-    return _api_internal._save_json(node)
+    return tvm.runtime._ffi_node_api.SaveJSON(node)
 
 
 def var(name="tindex", dtype=int32):
@@ -179,7 +139,7 @@ def var(name="tindex", dtype=int32):
     name : str
         The name
 
-    dtype : int
+    dtype : str
         The data type
 
     Returns
@@ -188,6 +148,25 @@ def var(name="tindex", dtype=int32):
         The result symbolic variable.
     """
     return _api_internal._Var(name, dtype)
+
+
+def size_var(name="size", dtype=int32):
+    """Create a new variable represents a tensor shape size, which is non-negative.
+
+    Parameters
+    ----------
+    name : str
+        The name
+
+    dtype : str
+        The data type
+
+    Returns
+    -------
+    var : SizeVar
+        The result symbolic shape variable.
+    """
+    return _api_internal._SizeVar(name, dtype)
 
 
 def any(*args):
@@ -256,7 +235,7 @@ def placeholder(shape, dtype=None, name="placeholder"):
     tensor: Tensor
         The created tensor
     """
-    shape = (shape,) if isinstance(shape, _expr.Expr) else shape
+    shape = (shape,) if isinstance(shape, _expr.PrimExpr) else shape
     dtype = float32 if dtype is None else dtype
     return _api_internal._Placeholder(
         shape, dtype, name)
@@ -293,7 +272,7 @@ def compute(shape, fcompute, name="compute", tag="", attrs=None):
         if tag != "":
             raise ValueError("nested tag is not allowed for now")
         tag = _tag.TagScope.get_current().tag
-    shape = (shape,) if isinstance(shape, _expr.Expr) else shape
+    shape = (shape,) if isinstance(shape, _expr.PrimExpr) else shape
     # for python3
     shape = tuple([int(s) if isinstance(s, float) else s for s in shape])
     ndim = len(shape)
@@ -482,8 +461,8 @@ def extern(shape,
         if tag != "":
             raise ValueError("nested tag is not allowed for now")
         tag = _tag.TagScope.get_current().tag
-    shape = (shape,) if isinstance(shape, (_expr.Expr, _Integral)) else shape
-    if shape == () or isinstance(shape[0], (_expr.Expr, _Integral)):
+    shape = (shape,) if isinstance(shape, (_expr.PrimExpr, _Integral)) else shape
+    if shape == () or isinstance(shape[0], (_expr.PrimExpr, _Integral)):
         shape = [shape]
     if in_buffers is not None:
         in_buffers = [in_buffers] if not isinstance(in_buffers, list) else in_buffers
@@ -518,7 +497,7 @@ def extern(shape,
         for shp, dt in zip(shape, dtype):
             output_placeholders.append(decl_buffer(shp, dt, name))
     body = fcompute(input_placeholders, output_placeholders)
-    if isinstance(body, _expr.Expr):
+    if isinstance(body, _expr.PrimExpr):
         body = _make.Evaluate(body)
 
     op = _api_internal._ExternOp(name, tag, attrs,
@@ -626,7 +605,7 @@ def decl_buffer(shape,
     If user pass a fully generic symbolic array to the strides,
     then the resulting function becomes fully generic.
     """
-    shape = (shape,) if isinstance(shape, (_expr.Expr, _Integral)) else shape
+    shape = (shape,) if isinstance(shape, (_expr.PrimExpr, _Integral)) else shape
     dtype = float32 if dtype is None else dtype
     strides = () if strides is None else strides
     if offset_factor != 0 and elem_offset is None:
@@ -827,7 +806,7 @@ def comm_reducer(fcombine, fidentity, name="reduce"):
             result = fcombine(lhs, rhs)
             id_elem = fidentity(*dtypes)
         else:
-            assert isinstance(expr, _expr.Expr)
+            assert isinstance(expr, _expr.PrimExpr)
             size = 1
             dtype = expr.dtype
             lvar = var(code.co_varnames[0], dtype)
@@ -1046,10 +1025,9 @@ def floormod(a, b):
     """
     return _make._OpFloorMod(a, b)
 
-
-_init_api("tvm.api")
-
 #pylint: disable=unnecessary-lambda
 sum = comm_reducer(lambda x, y: x+y, lambda t: const(0, dtype=t), name="sum")
 min = comm_reducer(lambda x, y: _make._OpMin(x, y), max_value, name='min')
 max = comm_reducer(lambda x, y: _make._OpMax(x, y), min_value, name='max')
+
+tvm._ffi._init_api("tvm.api")

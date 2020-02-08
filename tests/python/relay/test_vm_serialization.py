@@ -107,13 +107,13 @@ def test_serializer():
     assert any(item.startswith('fused_multiply') for item in prim_ops)
 
     code = exe.bytecode
-    assert "main 5 2 5" in code
-    assert "f1 2 1 3" in code
-    assert "f2 2 1 3" in code
+    assert "main(x1, y1)" in code
+    assert "f1(x)" in code
+    assert "f2(y)" in code
 
     code, lib = exe.save()
     assert isinstance(code, bytearray)
-    assert isinstance(lib, tvm.module.Module)
+    assert isinstance(lib, tvm.runtime.Module)
 
 
 def test_save_load():
@@ -133,7 +133,7 @@ def test_save_load():
     with open(tmp.relpath("code.ro"), "wb") as fo:
         fo.write(code)
 
-    loaded_lib = tvm.module.load(path_lib)
+    loaded_lib = tvm.runtime.load_module(path_lib)
     loaded_code = bytearray(open(tmp.relpath("code.ro"), "rb").read())
 
     # deserialize.

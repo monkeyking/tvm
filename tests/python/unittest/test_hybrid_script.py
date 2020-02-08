@@ -24,7 +24,7 @@ def run_and_check(func, args, var_dict={}, target='llvm', sch=None, outs=None):
     def tvm_val_2_py_val(val):
         val = tvm.ir_pass.Substitute(val, var_dict)
         val = tvm.ir_pass.Simplify(val)
-        assert isinstance(val, (tvm.expr.IntImm, tvm.expr.UIntImm))
+        assert isinstance(val, (tvm.expr.IntImm,))
         return val.value
 
     ctx = tvm.context(target, 0)
@@ -98,8 +98,8 @@ def outer_product(n, m, a, b):
 #Test global function
 #Test bridge between frontend and backend
 def test_outer_product():
-    n = tvm.var('n')
-    m = tvm.var('m')
+    n = tvm.size_var('n')
+    m = tvm.size_var('m')
     a = tvm.placeholder((n, ), name='a')
     b = tvm.placeholder((m, ), name='b')
 
@@ -123,12 +123,12 @@ def test_outer_product():
     assert ibody.extent.name == 'm'
     #Check loop body
     jblock = ibody.body
-    assert isinstance(jblock, tvm.stmt.Block)
-    jbody = jblock.first
+    assert isinstance(jblock, tvm.stmt.SeqStmt)
+    jbody = jblock[0]
     assert isinstance(jbody, tvm.stmt.AssertStmt)
     assert isinstance(jbody.message, tvm.expr.StringImm)
     assert jbody.message.value == "index out of range!"
-    jbody = jblock.rest
+    jbody = jblock[1]
     assert isinstance(jbody, tvm.stmt.Provide)
     assert jbody.func.name == 'c'
     assert len(jbody.args) == 2
@@ -167,7 +167,7 @@ def test_fanout():
             b[i] = sigma
         return b
 
-    n = tvm.var('n')
+    n = tvm.size_var('n')
     a = tvm.placeholder((n, ), 'float32', name='a')
     try:
         b = fanout(n, a)
@@ -191,12 +191,12 @@ def test_fanout():
     assert abody.func.name == 'sigma'
     #Check i loop body
     rbody = abody.body
-    assert isinstance(rbody.first, tvm.stmt.Provide)
-    assert rbody.first.func.name == 'sigma'
-    assert len(rbody.first.args) == 1
-    assert rbody.first.args[0].value == 0
+    assert isinstance(rbody[0], tvm.stmt.Provide)
+    assert rbody[0].func.name == 'sigma'
+    assert len(rbody[0].args) == 1
+    assert rbody[0].args[0].value == 0
     #Check fanout loop
-    jloop = rbody.rest.first
+    jloop = rbody[1]
     assert jloop.loop_var.name == 'j'
     assert jloop.min.value == 0
     assert jloop.extent.value == 3
@@ -214,7 +214,7 @@ def test_fanout():
     assert value.b.name == 'a'
     assert len(value.b.args) == 1
     assert tvm.ir_pass.Equal(value.b.args[0], ir.loop_var + jloop.loop_var)
-    divide= rbody.rest.rest.first
+    divide= rbody[2]
     assert isinstance(divide, tvm.stmt.Provide)
     assert len(divide.args) == 1
     assert divide.args[0].value == 0
@@ -224,7 +224,7 @@ def test_fanout():
     assert len(value.a.args) == 1
     assert value.a.args[0].value == 0
     assert abs(value.b.value - (1 / 3.0)) < 1e-5
-    write = rbody.rest.rest.rest
+    write = rbody[3]
     assert isinstance(write, tvm.stmt.Provide)
     assert write.func.name == 'b'
     assert write.value.name == 'sigma'
@@ -257,9 +257,9 @@ def test_looptype():
         ir = d.op.body
     except:
         return
-    iloop = ir.first
-    jloop = ir.rest.first
-    kloop = ir.rest.rest
+    iloop = ir[0]
+    jloop = ir[1]
+    kloop = ir[2]
     assert iloop.for_type == tvm.stmt.For.Parallel
     assert jloop.for_type == tvm.stmt.For.Vectorized
     assert kloop.for_type == tvm.stmt.For.Unrolled
@@ -405,8 +405,8 @@ def test_math_intrin():
     func = tvm.build(sch, [a8, b8])
     assert func
     a = numpy.arange(2, 10).astype('float32')
-    tvm_a = tvm.ndarray.array(a)
-    tvm_b = tvm.ndarray.array(numpy.zeros((8, ), dtype='float32'))
+    tvm_a = tvm.nd.array(a)
+    tvm_b = tvm.nd.array(numpy.zeros((8, ), dtype='float32'))
     b = intrin_real(a)
     func(tvm_a, tvm_b)
     tvm.testing.assert_allclose(b, tvm_b.asnumpy(), rtol=1e-5)
@@ -423,8 +423,8 @@ def test_math_intrin():
     func = tvm.build(sch, [a1, b1])
     assert func
     a = numpy.array([114514]).astype('int32')
-    tvm_a = tvm.ndarray.array(a)
-    tvm_b = tvm.ndarray.array(numpy.array([0]).astype('int32'))
+    tvm_a = tvm.nd.array(a)
+    tvm_b = tvm.nd.array(numpy.array([0]).astype('int32'))
     b = intrin_int(a)
     func(tvm_a, tvm_b)
     assert tvm_b.asnumpy()[0] == b[0]
@@ -578,8 +578,8 @@ def test_const_param():
     np_b = 11
     np_c = numpy.zeros((11, )).astype('int32')
 
-    nd_a = tvm.ndarray.array(np_a)
-    nd_c = tvm.ndarray.array(numpy.zeros((11, )).astype('int32'))
+    nd_a = tvm.nd.array(np_a)
+    nd_c = tvm.nd.array(numpy.zeros((11, )).astype('int32'))
     module(nd_a, nd_c)
     ref = add_something(np_a, 11)
 
@@ -614,8 +614,8 @@ def test_value_index():
     np_b, np_c = kernel_a(np_a)
     ref = kernel_b(np_c, np_b)
 
-    res = tvm.ndarray.array(numpy.zeros((4, 4)).astype('int32'))
-    module(tvm.ndarray.array(np_a), res)
+    res = tvm.nd.array(numpy.zeros((4, 4)).astype('int32'))
+    module(tvm.nd.array(np_a), res)
     tvm.testing.assert_allclose(res.asnumpy(), ref)
 
 def test_func_call():
@@ -789,6 +789,37 @@ def test_capture():
     func, ins, outs = run_and_check(add_something, [a])
     run_and_check(func, ins, outs=outs)
 
+def test_array_inputs():
+    @script
+    def sum_array(inputs):
+        out = output_tensor((10,), inputs[0].dtype)
+        n = len(inputs)
+        for i in range(10):
+            for j in const_range(n):
+                out[i] += inputs[j][i]
+        return out
+    n = 5
+    inputs = []
+    for i in range(n):
+        inputs.append(tvm.placeholder((10,), name='t%s' % i, dtype='float32'))
+
+    out = sum_array(tvm.convert(inputs))
+    assert len(out.op.inputs) == n
+
+    sch = tvm.create_schedule(out.op)
+    mod = tvm.build(sch, inputs + [out], target='llvm')
+    assert mod
+
+    input_nd = []
+    out_ref = numpy.zeros((10,))
+    for _ in range(n):
+        arr = numpy.random.uniform(size=(10,)).astype('float32')
+        input_nd.append(tvm.nd.array(arr))
+        out_ref += arr
+    out_nd = tvm.nd.array(numpy.zeros((10,), 'float32'))
+    mod(*input_nd, out_nd)
+    tvm.testing.assert_allclose(out_nd.asnumpy(), out_ref)
+
 if __name__ == "__main__":
     test_outer_product()
     test_fanout()
@@ -807,5 +838,6 @@ if __name__ == "__main__":
     test_const_range()
     test_schedule()
     test_capture()
+    test_array_inputs()
     # TODO:
     # test_inplace()

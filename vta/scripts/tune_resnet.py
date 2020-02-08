@@ -125,9 +125,11 @@ def compile_network(opt, env, target):
     dtype_dict.update({k: str(v.dtype) for k, v in params.items()})
 
     # Perform quantization in Relay
-    with relay.quantize.qconfig(global_scale=8.0,
-                                skip_conv_layers=[0]):
-        relay_prog = relay.quantize.quantize(mod["main"], params=params)
+    # Note: We set opt_level to 3 in order to fold batch norm
+    with relay.build_config(opt_level=3):
+        with relay.quantize.qconfig(global_scale=8.0,
+                                    skip_conv_layers=[0]):
+            relay_prog = relay.quantize.quantize(mod["main"], params=params)
 
     # Perform graph packing and constant folding for VTA target
     if target.device_name == "vta":
@@ -194,7 +196,7 @@ if __name__ == '__main__':
     opt = parse_arguments()
 
     # Make sure that TVM was compiled with RPC=1
-    assert tvm.module.enabled("rpc")
+    assert tvm.runtime.enabled("rpc")
 
     # Read in VTA environment
     env = vta.get_env()
@@ -232,7 +234,7 @@ if __name__ == '__main__':
     # VTA target and execution context
     target = env.target if opt.device == "vta" else env.target_vta_cpu
     ctx = remote.ext_dev(0) if opt.device == "vta" else remote.cpu(0)
-    
+
     # Compile Relay program
     print("Initial compile...")
     relay_prog, params = compile_network(opt, env, target)
@@ -264,7 +266,7 @@ if __name__ == '__main__':
     tune_tasks(tasks, **tuning_opt)
 
     # Compile kernels with history best records
-    with autotvm.tophub.context(target, extra_files=[opt.log_filename]): 
+    with autotvm.tophub.context(target, extra_files=[opt.log_filename]):
 
         # Compile network
         print("Compiling network with best tuning parameters...")

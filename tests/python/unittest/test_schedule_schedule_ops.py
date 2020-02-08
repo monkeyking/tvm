@@ -71,7 +71,7 @@ def test_schedule_scan():
     s = tvm.create_schedule(res.op)
     s = s.normalize()
     ir = tvm.lower(s, [s_state], simple_mode=True)
-    assert not hasattr(ir.body.body.body.body.rest.body.body.rest.body, "condition")
+    assert not hasattr(ir.body.body.body.body[1].body.body[1].body, "condition")
     bounds = tvm.schedule.InferBound(s)
     assert(bounds[res.op.scan_axis].min.value == 1)
     stmt = tvm.schedule.ScheduleOps(s, bounds)
@@ -444,7 +444,7 @@ def test_reduction_and_dummy_fuse_split():
     axo, axi = s[Y.op].split(ax, nparts=20)
     f = tvm.build(s, [Y, X])
 
-    args = [tvm.nd.empty((), 'int32')] + [tvm.ndarray.array(np.ones((n,), dtype='int32'))]
+    args = [tvm.nd.empty((), 'int32')] + [tvm.nd.array(np.ones((n,), dtype='int32'))]
     f(*args)
     assert args[0].asnumpy() == n
 
@@ -456,8 +456,8 @@ def test_reduction_and_dummy_fuse_split():
     ax = s[Y.op].fuse(*(list(Y.op.axis) + list(Y.op.reduce_axis)))
     f = tvm.build(s, [Y, X])
 
-    args = [tvm.ndarray.array(np.ones((n,), dtype='int32'))] + \
-        [tvm.ndarray.array(np.ones((n,), dtype='int32'))]
+    args = [tvm.nd.array(np.ones((n,), dtype='int32'))] + \
+        [tvm.nd.array(np.ones((n,), dtype='int32'))]
     f(*args)
     assert np.all(args[0].asnumpy() == n)
 

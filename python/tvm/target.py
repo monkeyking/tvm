@@ -47,19 +47,18 @@ The list of options include:
 
    Build TVM system library module. System lib is a global module that contains
    self registered functions in program startup. User can get the module using
-   :any:`tvm.module.system_lib`.
+   :any:`tvm.runtime.system_lib`.
    It is useful in environments where dynamic loading api like dlopen is banned.
    The system lib will be available as long as the result code is linked by the program.
 
 We can use :any:`tvm.target.create` to create a tvm.target.Target from the target string.
 We can also use other specific function in this module to create specific targets.
 """
-from __future__ import absolute_import
-
 import warnings
+import tvm._ffi
 
+from tvm.runtime import Object
 from ._ffi.base import _LIB_NAME
-from ._ffi.node import NodeBase, register_node
 from . import _api_internal
 
 try:
@@ -80,8 +79,8 @@ def _merge_opts(opts, new_opts):
     return opts
 
 
-@register_node
-class Target(NodeBase):
+@tvm._ffi.register_object
+class Target(Object):
     """Target device information, use through TVM API.
 
     Note
@@ -97,7 +96,7 @@ class Target(NodeBase):
     """
     def __new__(cls):
         # Always override new to enable class
-        obj = NodeBase.__new__(cls)
+        obj = Object.__new__(cls)
         obj._keys = None
         obj._options = None
         obj._libs = None
@@ -146,8 +145,8 @@ class Target(NodeBase):
         _api_internal._ExitTargetScope(self)
 
 
-@register_node
-class GenericFunc(NodeBase):
+@tvm._ffi.register_object
+class GenericFunc(Object):
     """GenericFunc node reference. This represents a generic function
     that may be specialized for different targets. When this object is
     called, a specialization is chosen based on the current target.
@@ -475,6 +474,7 @@ def arm_cpu(model='unknown', options=None):
         "p20":       ["-model=kirin970", "-target=arm64-linux-android -mattr=+neon"],
         "p20pro":    ["-model=kirin970", "-target=arm64-linux-android -mattr=+neon"],
         "rasp3b":    ["-model=bcm2837", "-target=armv7l-linux-gnueabihf -mattr=+neon"],
+        "rasp4b":    ["-model=bcm2711", "-target=arm-linux-gnueabihf -mattr=+neon"],
         "rk3399":    ["-model=rk3399", "-target=aarch64-linux-gnu -mattr=+neon"],
         "pynq":      ["-model=pynq", "-target=armv7a-linux-eabi -mattr=+neon"],
         "ultra96":   ["-model=ultra96", "-target=aarch64-linux-gnu -mattr=+neon"],
@@ -504,6 +504,19 @@ def vta(model='unknown', options=None):
     opts = _merge_opts(opts, options)
     ret = _api_internal._TargetCreate("ext_dev", *opts)
     return ret
+
+
+def bifrost(model='unknown', options=None):
+    """Return an ARM Mali GPU target (Bifrost architecture).
+
+    Parameters
+    ----------
+    options : str or list of str
+        Additional options
+    """
+    opts = ["-device=bifrost", '-model=%s' % model]
+    opts = _merge_opts(opts, options)
+    return _api_internal._TargetCreate("opencl", *opts)
 
 
 def create(target_str):

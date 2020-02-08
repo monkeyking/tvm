@@ -22,6 +22,7 @@ from tvm import relay
 from tvm.relay.scope_builder import ScopeBuilder
 from tvm.relay.testing.config import ctx_list
 from tvm.relay.prelude import Prelude
+from tvm.relay import testing
 import pytest
 
 def check_result(args, expected_result, mod=None):
@@ -47,23 +48,18 @@ def veval(f, *args, ctx=tvm.cpu(), target="llvm"):
     if isinstance(f, relay.Expr):
         mod = relay.Module()
         mod["main"] = f
-        exe = relay.vm.compile(mod, target)
-        vm = relay.vm.VirtualMachine(exe)
-        vm.init(ctx)
-        return vm.invoke("main", *args)
     else:
         assert isinstance(f, relay.Module), "expected expression or module"
         mod = f
-        exe = relay.vm.compile(mod, target)
-        vm = relay.vm.VirtualMachine(exe)
-        vm.init(ctx)
-        ret = vm.invoke("main", *args)
-        return ret
+    exe = relay.vm.compile(mod, target)
+    vm = relay.vm.VirtualMachine(exe)
+    vm.init(ctx)
+    return vm.invoke("main", *args)
 
 def vmobj_to_list(o):
-    if isinstance(o, tvm.relay.backend.vm.Tensor):
+    if isinstance(o, tvm.nd.NDArray):
         return [o.asnumpy().tolist()]
-    elif isinstance(o, tvm.relay.backend.vm.ADT):
+    elif isinstance(o, tvm.container.ADT):
         result = []
         for f in o:
             result.extend(vmobj_to_list(f))
@@ -575,37 +571,10 @@ def test_add_op_broadcast():
     mod["main"] = func
     check_result([x_data, y_data], x_data + y_data, mod=mod)
 
+def test_vm_optimize():
+    mod, params = testing.resnet.get_workload(batch_size=1, num_layers=18)
+    comp = relay.backend.vm.VMCompiler()
+    opt_mod, _ = comp.optimize(mod, "llvm", params)
 
 if __name__ == "__main__":
-    test_id()
-    test_op()
-    test_cond()
-    test_simple_if()
-    test_simple_call()
-    test_count_loop()
-    test_sum_loop()
-    test_tuple_fst()
-    test_tuple_second()
-    test_let_scalar()
-    test_let_tensor()
-    test_split()
-    test_split_no_fuse()
-    test_list_constructor()
-    test_let_tensor()
-    test_let_scalar()
-    test_compose()
-    test_list_hd()
-    test_list_tl_empty_list()
-    test_list_tl()
-    test_list_nth()
-    test_list_update()
-    test_list_length()
-    test_list_map()
-    test_list_foldl()
-    test_list_foldr()
-    test_list_sum()
-    test_list_filter()
-    test_closure()
-    test_add_op_scalar()
-    test_add_op_tensor()
-    test_add_op_broadcast()
+    pytest.main([__file__])

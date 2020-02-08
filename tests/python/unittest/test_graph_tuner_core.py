@@ -18,7 +18,7 @@
 # NOTE: We name this test file to start with test_graph_tuner
 # to make it execute after zero_rank tensor test cases. This
 # helps avoid topi arithmetic operator overloading issue:
-# https://github.com/dmlc/tvm/issues/3240.
+# https://github.com/apache/incubator-tvm/issues/3240.
 # TODO: restore the file name after this issue is resolved.
 import os
 import copy
@@ -50,9 +50,9 @@ def _create_data(target, dshape, dtype, layout):
                                               params=params,
                                               ops=(relay.op.nn.conv2d,))
     wkl_list = [
-        create_workload((1, 3, 8, 8), (16, 3, 3, 3), (1, 1), (1, 1), (1, 1), layout, layout, dtype, dtype),
-        create_workload((1, 16, 8, 8), (32, 16, 1, 1), (1, 1), (0, 0), (1, 1), layout, layout, dtype, dtype),
-        create_workload((1, 32, 8, 8), (32, 32, 3, 3), (1, 1), (1, 1), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 3, 8, 8), (16, 3, 3, 3), (1, 1), (1, 1, 1, 1), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 16, 8, 8), (32, 16, 1, 1), (1, 1), (0, 0, 0, 0), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 32, 8, 8), (32, 32, 3, 3), (1, 1), (1, 1, 1, 1), (1, 1), layout, layout, dtype, dtype),
     ]
     costs = [0.04, 0.012, 0.03]
     config_list = []
@@ -279,9 +279,9 @@ def test_many_sub_graphs():
                                               params=params,
                                               ops=(relay.op.nn.conv2d,))
     wkl_list = [
-        create_workload((1, 3, 8, 8), (16, 3, 3, 3), (1, 1), (1, 1), (1, 1), layout, layout, dtype, dtype),
-        create_workload((1, 16, 8, 8), (32, 16, 1, 1), (1, 1), (0, 0), (1, 1), layout, layout, dtype, dtype),
-        create_workload((1, 32, 8, 8), (32, 32, 3, 3), (1, 1), (1, 1), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 3, 8, 8), (16, 3, 3, 3), (1, 1), (1, 1, 1, 1), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 16, 8, 8), (32, 16, 1, 1), (1, 1), (0, 0, 0, 0), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 32, 8, 8), (32, 32, 3, 3), (1, 1), (1, 1, 1, 1), (1, 1), layout, layout, dtype, dtype),
     ]
     costs = [0.04, 0.012, 0.03, 0.02, 0.02, 0.045]
     config_list = []
@@ -392,8 +392,8 @@ def test_tuple():
                                               params=params,
                                               ops=(relay.op.nn.conv2d,))
     wkl_list = [
-        create_workload((1, 5, 32, 32), (2, 5, 3, 3), (1, 1), (1, 1), (1, 1), layout, layout, dtype, dtype),
-        create_workload((1, 5, 32, 32), (3, 5, 3, 3), (1, 1), (1, 1), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 5, 32, 32), (2, 5, 3, 3), (1, 1), (1, 1, 1, 1), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 5, 32, 32), (3, 5, 3, 3), (1, 1), (1, 1, 1, 1), (1, 1), layout, layout, dtype, dtype),
     ]
     costs = [0.01, 0.012, 0.03, 0.04]
     config_list = []
@@ -490,9 +490,9 @@ def test_triangle_block():
                                               params=params,
                                               ops=(relay.op.nn.conv2d,))
     wkl_list = [
-        create_workload((1, 3, 8, 8), (16, 3, 3, 3), (1, 1), (1, 1), (1, 1), layout, layout, dtype, dtype),
-        create_workload((1, 16, 8, 8), (32, 16, 1, 1), (1, 1), (0, 0), (1, 1), layout, layout, dtype, dtype),
-        create_workload((1, 3, 8, 8), (32, 3, 3, 3), (1, 1), (1, 1), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 3, 8, 8), (16, 3, 3, 3), (1, 1), (1, 1, 1, 1), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 16, 8, 8), (32, 16, 1, 1), (1, 1), (0, 0, 0, 0), (1, 1), layout, layout, dtype, dtype),
+        create_workload((1, 3, 8, 8), (32, 3, 3, 3), (1, 1), (1, 1, 1, 1), (1, 1), layout, layout, dtype, dtype),
     ]
     costs = [0.04, 0.012, 0.03, 0.02, 0.02, 0.045]
     config_list = []

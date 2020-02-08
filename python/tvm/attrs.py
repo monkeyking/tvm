@@ -15,13 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 """ TVM Attribute module, which is mainly used for defining attributes of operators"""
-from ._ffi.node import NodeBase, register_node as _register_tvm_node
-from ._ffi.function import _init_api
+import tvm._ffi
+
+from tvm.runtime import Object
 from . import _api_internal
 
 
-@_register_tvm_node
-class Attrs(NodeBase):
+@tvm._ffi.register_object
+class Attrs(Object):
     """Attribute node, which is mainly use for defining attributes of relay operators.
 
     Used by function registered in python side, such as compute, schedule and alter_layout.
@@ -92,4 +93,4 @@ class Attrs(NodeBase):
         return self.__getattr__(item)
 
 
-_init_api("tvm.attrs")
+tvm._ffi._init_api("tvm.attrs")

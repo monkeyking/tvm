@@ -313,7 +313,8 @@ def _UpsampleLayerParams(op, inexpr, etab):
         raise tvm.error.OpAttributeUnimplemented(
             'Upsample height and width must be equal.')
     interpolationMode = 'nearest_neighbor' if op.mode == 0 else 'bilinear'
-    return _op.nn.upsampling(inexpr, scale=op.scalingFactor[0], method=interpolationMode)
+    return _op.nn.upsampling(inexpr, scale_h=op.scalingFactor[0],
+                             scale_w=op.scalingFactor[1], method=interpolationMode)
 
 
 def _L2NormalizeLayerParams(op, inexpr, etab):
@@ -454,7 +455,7 @@ def from_coreml(model, shape=None):
     mod : tvm.relay.Module
         The relay module for compilation.
 
-    params : dict of str to tvm.NDArray
+    params : dict of str to tvm.nd.NDArray
         The parameter dict to be used by Relay.
     """
     try:

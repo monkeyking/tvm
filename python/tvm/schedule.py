@@ -15,39 +15,19 @@
 # specific language governing permissions and limitations
 # under the License.
 """The computation schedule api of TVM."""
-from __future__ import absolute_import as _abs
-from ._ffi.base import string_types
-from ._ffi.node import NodeBase, register_node
-from ._ffi.node import convert_to_node as _convert_to_node
-from ._ffi.function import _init_api, Function
-from ._ffi.function import convert_to_tvm_func as _convert_tvm_func
+import tvm._ffi
+
+from tvm._ffi.base import string_types
+from tvm.runtime import Object, convert
+
 from . import _api_internal
 from . import tensor as _tensor
 from . import expr as _expr
 from . import container as _container
 
-def convert(value):
-    """Convert value to TVM node or function.
 
-    Parameters
-    ----------
-    value : python value
-
-    Returns
-    -------
-    tvm_val : Node or Function
-        Converted value in TVM
-    """
-    if isinstance(value, (Function, NodeBase)):
-        return value
-
-    if callable(value):
-        return _convert_tvm_func(value)
-
-    return _convert_to_node(value)
-
-@register_node
-class Buffer(NodeBase):
+@tvm._ffi.register_object
+class Buffer(Object):
     """Symbolic data buffer in TVM.
 
     Buffer provide a way to represent data layout
@@ -132,7 +112,7 @@ class Buffer(NodeBase):
         load : Expr
             The corresponding load expression.
         """
-        begin = (begin,) if isinstance(begin, (int, _expr.Expr)) else begin
+        begin = (begin,) if isinstance(begin, (int, _expr.PrimExpr)) else begin
         dtype = dtype if dtype else self.dtype
         return _api_internal._BufferVLoad(self, begin, dtype)
 
@@ -152,27 +132,27 @@ class Buffer(NodeBase):
         store : Stmt
             The corresponding store stmt.
         """
-        begin = (begin,) if isinstance(begin, (int, _expr.Expr)) else begin
+        begin = (begin,) if isinstance(begin, (int, _expr.PrimExpr)) else begin
         return _api_internal._BufferVStore(self, begin, value)
 
 
-@register_node
-class Split(NodeBase):
+@tvm._ffi.register_object
+class Split(Object):
     """Split operation on axis."""
 
 
-@register_node
-class Fuse(NodeBase):
+@tvm._ffi.register_object
+class Fuse(Object):
     """Fuse operation on axis."""
 
 
-@register_node
-class Singleton(NodeBase):
+@tvm._ffi.register_object
+class Singleton(Object):
     """Singleton axis."""
 
 
-@register_node
-class IterVar(NodeBase, _expr.ExprOp):
+@tvm._ffi.register_object
+class IterVar(Object, _expr.ExprOp):
     """Represent iteration variable.
 
     IterVar is normally created by Operation, to represent
@@ -214,8 +194,8 @@ def create_schedule(ops):
     return _api_internal._CreateSchedule(ops)
 
 
-@register_node
-class Schedule(NodeBase):
+@tvm._ffi.register_object
+class Schedule(Object):
     """Schedule for all the stages."""
     def __getitem__(self, k):
         if isinstance(k, _tensor.Tensor):
@@ -348,8 +328,8 @@ class Schedule(NodeBase):
         return factored[0] if len(factored) == 1 else factored
 
 
-@register_node
-class Stage(NodeBase):
+@tvm._ffi.register_object
+class Stage(Object):
     """A Stage represents schedule for one operation."""
     def split(self, parent, factor=None, nparts=None):
         """Split the stage either by factor providing outer scope, or both
@@ -670,4 +650,4 @@ class Stage(NodeBase):
         """
         _api_internal._StageOpenGL(self)
 
-_init_api("tvm.schedule")
+tvm._ffi._init_api("tvm.schedule")

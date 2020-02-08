@@ -25,9 +25,6 @@ Server is TCP based with the following protocol:
    - {server|client}:device-type[:random-key] [-timeout=timeout]
 """
 # pylint: disable=invalid-name
-
-from __future__ import absolute_import
-
 import os
 import ctypes
 import socket
@@ -39,12 +36,13 @@ import subprocess
 import time
 import sys
 import signal
+import platform
+import tvm._ffi
 
-from .._ffi.function import register_func
-from .._ffi.base import py_str
-from .._ffi.libinfo import find_lib_path
-from ..module import load as _load_module
-from ..contrib import util
+from tvm._ffi.base import py_str
+from tvm._ffi.libinfo import find_lib_path
+from tvm.runtime.module import load_module as _load_module
+from tvm.contrib import util
 from . import base
 from . base import TrackerCode
 
@@ -58,11 +56,11 @@ def _server_env(load_library, work_path=None):
         temp = util.tempdir()
 
     # pylint: disable=unused-variable
-    @register_func("tvm.rpc.server.workpath")
+    @tvm._ffi.register_func("tvm.rpc.server.workpath")
     def get_workpath(path):
         return temp.relpath(path)
 
-    @register_func("tvm.rpc.server.load_module", override=True)
+    @tvm._ffi.register_func("tvm.rpc.server.load_module", override=True)
     def load_module(file_name):
         """Load module from remote side."""
         path = temp.relpath(file_name)
@@ -366,7 +364,10 @@ class Server(object):
             # interim, stop the pylint diagnostic.
             #
             # pylint: disable=subprocess-popen-preexec-fn
-            self.proc = subprocess.Popen(cmd, preexec_fn=os.setsid)
+            if platform.system() == "Windows":
+                self.proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+            else:
+                self.proc = subprocess.Popen(cmd, preexec_fn=os.setsid)
             time.sleep(0.5)
         elif not is_proxy:
             sock = socket.socket(base.get_addr_family((host, port)), socket.SOCK_STREAM)

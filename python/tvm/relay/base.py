@@ -16,13 +16,13 @@
 # under the License.
 # pylint: disable=no-else-return, unidiomatic-typecheck
 """The base node types for the Relay language."""
-from __future__ import absolute_import as _abs
-from .._ffi.node import NodeBase, register_node as _register_tvm_node
+import tvm._ffi
+
+from tvm.runtime import Object
 from . import _make
 from . import _expr
 from . import _base
 
-NodeBase = NodeBase
 
 def register_relay_node(type_key=None):
     """Register a Relay node type.
@@ -33,9 +33,9 @@ def register_relay_node(type_key=None):
         The type key of the node.
     """
     if not isinstance(type_key, str):
-        return _register_tvm_node(
+        return tvm._ffi.register_object(
             "relay." + type_key.__name__)(type_key)
-    return _register_tvm_node(type_key)
+    return tvm._ffi.register_object(type_key)
 
 
 def register_relay_attr_node(type_key=None):
@@ -47,12 +47,12 @@ def register_relay_attr_node(type_key=None):
         The type key of the node.
     """
     if not isinstance(type_key, str):
-        return _register_tvm_node(
+        return tvm._ffi.register_object(
             "relay.attrs." + type_key.__name__)(type_key)
-    return _register_tvm_node(type_key)
+    return tvm._ffi.register_object(type_key)
 
 
-class RelayNode(NodeBase):
+class RelayNode(Object):
     """Base class of all Relay nodes."""
     def astext(self, show_meta_data=True, annotate=None):
         """Get the text format of the expression.
@@ -102,7 +102,7 @@ class SourceName(RelayNode):
         self.__init_handle_by_constructor__(_make.SourceName, name)
 
 @register_relay_node
-class Id(NodeBase):
+class Id(Object):
     """Unique identifier(name) used in Var.
        Guaranteed to be stable across all passes.
     """

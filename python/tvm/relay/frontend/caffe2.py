@@ -280,7 +280,7 @@ class ResizeNearest(Caffe2OpConverter):
         assert width_scale == height_scale
 
         return _op.nn.upsampling(
-            inputs[0], scale=int(width_scale), method="NEAREST_NEIGHBOR")
+            inputs[0], scale_h=int(width_scale), scale_w=int(width_scale), method="NEAREST_NEIGHBOR")
 
 
 class Sum(Caffe2OpConverter):
@@ -567,8 +567,8 @@ def from_caffe2(init_net, predict_net, shape=None, dtype="float32"):
     mod : tvm.relay.Module
         The module that optimizations will be performed on.
 
-    params : dict of str to tvm.ndarray
-        Dict of converted parameters stored in tvm.ndarray format
+    params : dict of str to tvm.nd.NDArray
+        Dict of converted parameters stored in tvm.nd.NDArray format
     """
 
     caffe2 = Caffe2NetDef(shape, dtype)

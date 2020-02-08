@@ -20,13 +20,14 @@ from __future__ import absolute_import
 from numbers import Number as _Number
 
 import numpy as _np
+from tvm._ffi import base as _base
+from tvm.runtime import NDArray, convert, ndarray as _nd
+
 from .base import RelayNode, register_relay_node
 from . import _make
 from . import _expr
 from . import ty as _ty
-from .._ffi import base as _base
-from .. import nd as _nd
-from .. import convert
+
 
 # will be registered afterwards
 _op_make = None
@@ -304,6 +305,20 @@ class Function(Expr):
             Arguments.
         """
         return Call(self, args, None, None)
+
+    def get_params(self):
+        return _expr.FunctionGetParams(self)
+
+    def set_params(self, params):
+        for key in params:
+            value = params[key]
+            if isinstance(value, NDArray):
+                params[key] = Constant(value)
+
+        return _expr.FunctionSetParams(self, params)
+
+    def set_attribute(self, name, ref):
+        return _expr.FunctionSetAttr(self, name, ref)
 
 
 @register_relay_node
